@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RestController
-@RequestMapping(path="/api/products")
+@RequestMapping(path = "/api/products")
 public class ProductController {
 
     private static final String PRODUCT_ID = "ProductID";
@@ -40,25 +40,59 @@ public class ProductController {
         DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
         Key productKey = KeyFactory.createKey(PRODUCT_KIND, "productKey");
         Entity productEntity = new Entity(PRODUCT_KIND, productKey);
-        this.productToEntity (product, productEntity);
+        this.productToEntity(product, productEntity);
         datastore.put(productEntity);
         product.setId(productEntity.getKey().getId());
-        return new	ResponseEntity<Product>(product, HttpStatus.CREATED);
+        return new ResponseEntity<Product>(product, HttpStatus.CREATED);
     }
 
     @GetMapping
-    public ResponseEntity<List<Product>> getProducts()	{
+    public ResponseEntity<List<Product>> getProducts() {
         List<Product> products = new ArrayList<>();
         DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
         Query query;
-        query =	new	Query(PRODUCT_KIND).addSort("Code", Query.SortDirection.ASCENDING);
-        List<Entity> productsEntities =	datastore.prepare(query).asList(FetchOptions.Builder.withDefaults());
+        query = new Query(PRODUCT_KIND).addSort("Code", Query.SortDirection.ASCENDING);
+        List<Entity> productsEntities = datastore.prepare(query).asList(FetchOptions.Builder.withDefaults());
 
-        for	(Entity	productEntity : productsEntities)	{
-            Product	product	= entityToProduct(productEntity);
+        for (Entity productEntity : productsEntities) {
+            Product product = entityToProduct(productEntity);
             products.add(product);
         }
 
-        return new	ResponseEntity<List<Product>>(products,	HttpStatus.OK);
+        return new ResponseEntity<List<Product>>(products, HttpStatus.OK);
+    }
+
+    @GetMapping("/{code}")
+    public ResponseEntity<Product> getProduct(@PathVariable int code) {
+
+        DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
+        Query.Filter codeFilter = new Query.FilterPredicate("Code", Query.FilterOperator.EQUAL, code);
+        Query query = new Query(PRODUCT_KIND).setFilter(codeFilter);
+        Entity productEntity = datastore.prepare(query).asSingleEntity();
+
+        if (productEntity != null) {
+            Product product = entityToProduct(productEntity);
+            return new ResponseEntity<Product>(product, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+    }
+
+    @PutMapping(path = "/{code}")
+    public ResponseEntity<Product> updateProduct(@RequestBody Product product, @PathVariable("code") int code) {
+        DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
+        Query.Filter codeFilter = new Query.FilterPredicate("Code", Query.FilterOperator.EQUAL, code);
+        Query query = new Query(PRODUCT_KIND).setFilter(codeFilter);
+        Entity productEntity = datastore.prepare(query).asSingleEntity();
+
+        if (productEntity != null) {
+            productToEntity(product, productEntity);
+            datastore.put(productEntity);
+            product.setId(productEntity.getKey().getId());
+            return new ResponseEntity<Product>(product, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
     }
 }
