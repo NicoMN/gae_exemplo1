@@ -95,4 +95,21 @@ public class ProductController {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
+
+    @DeleteMapping(path = "/{code}")
+    public ResponseEntity<Product> deleteProduct(@PathVariable("code") int code) {
+
+        DatastoreService datastore = DatastoreServiceFactory.getDatastoreService();
+        Query.Filter codeFilter = new Query.FilterPredicate("Code", Query.FilterOperator.EQUAL, code);
+        Query query = new Query(PRODUCT_KIND).setFilter(codeFilter);
+        Entity productEntity = datastore.prepare(query).asSingleEntity();
+
+        if (productEntity != null) {
+            datastore.delete(productEntity.getKey());
+            Product product = entityToProduct(productEntity);
+            return new ResponseEntity<Product>(product, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
 }
