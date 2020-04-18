@@ -9,11 +9,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Repository;
 
 import javax.annotation.PostConstruct;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.logging.Logger;
+import javax.cache.Cache;
+import javax.cache.CacheException;
+import javax.cache.CacheFactory;
+import javax.cache.CacheManager;
 
 @Repository
 public class UserRepository {
@@ -29,6 +30,44 @@ public class UserRepository {
     private static final String PROPERTY_LAST_FCM_REGISTER = "lastFCMRegister";
     private static final String PROPERTY_ROLE = "role";
     private static final String PROPERTY_ENABLED = "enabled";
+
+    public void updateUserLogin(User user) {
+        boolean canUseCache = true;
+        boolean saveOnCache = true;
+        Cache cache;
+
+        try {
+            CacheFactory cacheFactory = CacheManager.getInstance().getCacheFactory();
+            cache = cacheFactory.createCache(Collections.emptyMap());
+
+            if (cache.containsKey(user.getEmail())) {
+                Date lastLogin = (Date) cache.get(user.getEmail());
+                if ((Calendar.getInstance().getTime().getTime() - lastLogin.getTime()) < 30000) {
+                    saveOnCache = false;
+                }
+
+            }
+
+            if (saveOnCache) {
+                cache.put(user.getEmail(), (Date) Calendar.getInstance().getTime());
+                canUseCache = false;
+            }
+
+        } catch (CacheException e) {
+            canUseCache = false;
+        }
+
+        if (!canUseCache) {
+            user.setLastLogin((Date) Calendar.getInstance().getTime());
+
+            try {
+                this.updateUser(user, user.getEmail());
+            } catch (UserAlreadyExistsException | UserNotFoundException e) {
+                log.severe("Falha ao atualizar último login do usuário");
+            }
+
+        }
+    }
 
     @Autowired
     private PasswordEncoder passwordEncoder;
